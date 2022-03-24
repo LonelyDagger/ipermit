@@ -2,7 +2,7 @@
   "name": "ipermit",
   "version": "0.1.0",
   "description": "A universal permission managing framework for Node",
-  "main": "index.js",
+  "main": "dist/index.js",
   "files": [
     "dist"
   ],
@@ -11,8 +11,8 @@
     "node": ">=12.0.0"
   },
   "scripts": {
-    "build": "(rm -rf ./dist||del /S /Q .\\dist)&&tsc",
-    "publish": "npm run build&&echo 1"
+    "build": "(rm -rf ./dist||del /S /Q .\\dist)&&tsc&&(cp ./src/index.js ./dist/index.js||copy /B  .\\src\\index.js .\\dist\\index.js)",
+    "prepack": "npm run build"
   },
   "publishConfig": {
     "access": "public"

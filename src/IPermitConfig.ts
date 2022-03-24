@@ -11,8 +11,5 @@ let defaultConfig: IPermitConfig;
 function provideConfig(config: IPermitConfig) {
   defaultConfig = config;
 }
-function printConfig() {
-  console.log(JSON.stringify(defaultConfig));
-}
 
-export { IPermitConfig, provideConfig, printConfig };
+export { IPermitConfig, provideConfig };
