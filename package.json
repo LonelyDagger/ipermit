@@ -1,0 +1,37 @@
+{
+  "name": "ipermit",
+  "version": "0.1.0",
+  "description": "A universal permission managing framework for Node",
+  "main": "index.js",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "scripts": {
+    "build": "(rm -rf ./dist||del /S /Q .\\dist)&&tsc",
+    "publish": "npm run build&&echo 1"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "bugs": {
+    "url": "https://github.com/LonelyDagger/ipermit/issues",
+    "email": "LonelyDagger@foxmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LonelyDagger/ipermit.git"
+  },
+  "homepage": "https://github.com/LonelyDagger/ipermit",
+  "keywords": [
+    "permission"
+  ],
+  "author": "LonelyDagger",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^4.6.2"
+  }
+}
