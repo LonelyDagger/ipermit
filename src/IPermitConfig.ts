@@ -1,5 +1,6 @@
-import { TimeSpan } from "./utils/TimeSpan";
+import { TimeSpan, getMsFromTimeSpan } from "./utils/TimeSpan.js";
 import { MongoClient } from "mongodb";
+import { connect, prepareDatabase } from "./MongoDBProvider.js";
 
 class MongoDBProvider {
   type = 'mongodb';
@@ -10,7 +11,7 @@ class MongoDBProvider {
 }
 
 class CacheConfig {
-  enabled?: boolean = true;
+  enabled?: boolean;
   /** Remove cache when the length of the cache array exceeds. */
   maxLength?: {
     value: number;
@@ -85,16 +86,12 @@ enum CacheType {
   FindRelevantPolicy = 'findRelevantPolicy',
   CompilePolicyCheckTree = 'compilePolicyCheckTree',
   CheckPerm = 'checkPerm'
-} const str = "Hello!";
-for (const s of str) {
-  console.log(s);
 }
 
 class IPermitConfig {
-  dataProvider: MongoDBProvider | { type: 'custom' }
+  dataProvider: MongoDBProvider
     = {
-      type: 'mongodb',
-      connectionString: 'mongodb://127.0.0.1'
+      type: 'mongodb'
     };
   shortCircuit?: 'always' | 'allow' | 'never'
     = 'allow';
@@ -111,9 +108,20 @@ class IPermitConfig {
     };
 }
 
-let defaultConfig: IPermitConfig;
-function provideConfig(config: IPermitConfig) {
-  defaultConfig = config;
+let innerConfig: any = {};
+let originalConfig: IPermitConfig;
+async function config(config: IPermitConfig) {
+  originalConfig = config;
+  if (config.cache !== false)
+    for (const i in CacheType) {
+      let a = CacheType[<keyof typeof CacheType>i];
+      innerConfig[`cache_${i}_enabled`] = typeof config.cache === 'boolean' ? config.cache : (config.cache?.enabled ?? true);
+      innerConfig[`cache_${i}_maxLength`] = config.cache === true ? 500 : (config.cache?.maxLength ?? true);
+    }
+  //TODO Map originalConfig to flat innerConfig.
+
+  innerConfig.dataProvider_db = await connect(config.dataProvider.mongnClient ?? config.dataProvider.connectionString ?? 'mongodb://127.0.0.1/ipermit');
+  prepareDatabase(innerConfig.dataProvider_db, config.dataProvider.database, config.dataProvider.collectionPrefix);
 }
 
-export { IPermitConfig, provideConfig };
+export { IPermitConfig, config };

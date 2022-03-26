@@ -1,6 +1,6 @@
 {
   "name": "ipermit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A universal permission managing framework for Node",
   "main": "dist/index.js",
   "files": [
@@ -11,7 +11,9 @@
     "node": ">=12.0.0"
   },
   "scripts": {
-    "build": "(rm -rf ./dist||del /S /Q .\\dist)&&tsc&&(cp ./src/index.js ./dist/index.js||copy /B  .\\src\\index.js .\\dist\\index.js)",
+    "testOnly": "node ./test/index.js",
+    "test": "npm run build&&npm run testOnly",
+    "build": "(rm -rf ./dist||(rmdir /S /Q .\\dist||echo Directory ./dist doesn't exist.)||1)&&tsc",
     "prepack": "npm run build"
   },
   "publishConfig": {
