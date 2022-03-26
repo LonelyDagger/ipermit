@@ -2,7 +2,7 @@ import { TimeSpan, getMsFromTimeSpan } from "./utils/TimeSpan.js";
 import { MongoClient } from "mongodb";
 import { connect, prepareDatabase } from "./MongoDBProvider.js";
 
-class MongoDBProvider {
+export class MongoDBProvider {
   type = 'mongodb';
   connectionString?: `${'mongodb' | 'mongodb+srv'}://${string}`;
   mongnClient?: MongoClient;
@@ -10,7 +10,7 @@ class MongoDBProvider {
   collectionPrefix?: string
 }
 
-class CacheConfig {
+export class CacheConfig {
   enabled?: boolean;
   /** Remove cache when the length of the cache array exceeds. */
   maxLength?: {
@@ -81,14 +81,15 @@ class CacheConfig {
   ensureReliable?: 'force' | 'complete' | 'efficient' | false;
 }
 
-enum CacheType {
+export enum CacheType {
   EntityInherit = 'entityInherit',
   FindRelevantPolicy = 'findRelevantPolicy',
   CompilePolicyCheckTree = 'compilePolicyCheckTree',
   CheckPerm = 'checkPerm'
 }
 
-class IPermitConfig {
+/** Object to config IPermit. */
+export class IPermitConfig {
   dataProvider: MongoDBProvider
     = {
       type: 'mongodb'
@@ -110,7 +111,16 @@ class IPermitConfig {
 
 let innerConfig: any = {};
 let originalConfig: IPermitConfig;
-async function config(config: IPermitConfig) {
+
+/**
+ * Config and init IPermit.
+ * 
+ * IPermit will connect to data provider and prepare it for use (including creating database).
+ * 
+ * @param config An object to config IPermit.
+ * @returns A promise which resolved after data provider is ready.
+ */
+export async function config(config: IPermitConfig): Promise<void> {
   originalConfig = config;
   if (config.cache !== false)
     for (const i in CacheType) {
@@ -123,5 +133,3 @@ async function config(config: IPermitConfig) {
   innerConfig.dataProvider_db = await connect(config.dataProvider.mongnClient ?? config.dataProvider.connectionString ?? 'mongodb://127.0.0.1/ipermit');
   prepareDatabase(innerConfig.dataProvider_db, config.dataProvider.database, config.dataProvider.collectionPrefix);
 }
-
-export { IPermitConfig, config };
