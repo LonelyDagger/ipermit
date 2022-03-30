@@ -13,7 +13,7 @@
   "scripts": {
     "testOnly": "node ./test/index.js",
     "test": "npm run build&&npm run testOnly",
-    "doc": "typedoc ./src/index.ts",
+    "doc": "typedoc",
     "build": "(rm -rf ./dist||(rmdir /S /Q .\\dist||echo Directory ./dist doesn't exist.)||1)&&tsc",
     "prepack": "npm run build"
   },

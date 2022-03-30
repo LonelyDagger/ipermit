@@ -1,9 +1,9 @@
 import { TimeSpan, getMsFromTimeSpan } from "./utils/TimeSpan.js";
 import { MongoClient } from "mongodb";
-import { connect, prepareDatabase } from "./MongoDBProvider.js";
+import { connect, prepareDatabase, setDefaultDb } from "./MongoDBProvider.js";
 
 export class MongoDBProvider {
-  type = 'mongodb';
+  type: 'mongodb' = 'mongodb';
   connectionString?: `${'mongodb' | 'mongodb+srv'}://${string}`;
   mongnClient?: MongoClient;
   database?: string;
@@ -122,6 +122,7 @@ let originalConfig: IPermitConfig;
  */
 export async function config(config: IPermitConfig): Promise<void> {
   originalConfig = config;
+
   if (config.cache !== false)
     for (const i in CacheType) {
       let a = CacheType[<keyof typeof CacheType>i];
@@ -131,5 +132,6 @@ export async function config(config: IPermitConfig): Promise<void> {
   //TODO Map originalConfig to flat innerConfig.
 
   innerConfig.dataProvider_db = await connect(config.dataProvider.mongnClient ?? config.dataProvider.connectionString ?? 'mongodb://127.0.0.1/ipermit');
-  prepareDatabase(innerConfig.dataProvider_db, config.dataProvider.database, config.dataProvider.collectionPrefix);
+  const db = await prepareDatabase(innerConfig.dataProvider_db, config.dataProvider.database, config.dataProvider.collectionPrefix);
+  setDefaultDb(db);
 }

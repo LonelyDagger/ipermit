@@ -1,0 +1,9 @@
+{
+  "entryPoints": [
+    "./src/index.ts"
+  ],
+  "out": "./docs",
+  "githubPages": false,
+  "cleanOutputDir": true,
+  "disableSources": false
+}

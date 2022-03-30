@@ -1,5 +1,10 @@
 import { Db, MongoClient } from "mongodb";
 
+let defaultDb: Db;
+
+export function getDefaultDb() { return defaultDb; }
+export function setDefaultDb(newDb: Db) { defaultDb = newDb; }
+
 export async function connect(from: string | MongoClient): Promise<MongoClient> {
   if (typeof from === 'string')
     return await new MongoClient(from, { appName: 'IPermit' }).connect();
@@ -7,21 +12,22 @@ export async function connect(from: string | MongoClient): Promise<MongoClient> 
     return from;
 }
 
-async function ensureCollection(db: Db, collName: string, collOptions: Object, createNew: boolean) {
+async function ensureCollection(db: Db, collName: string, collOptions?: Object, createNew: boolean = true) {
   if (createNew)
     return await db.createCollection(collName, collOptions);
   else {
-    await db.command(Object.assign({ collMod: collName }, collOptions));
+    if (collOptions)
+      await db.command(Object.assign({ collMod: collName }, collOptions));
     return db.collection(collName);
   }
 }
 
-export async function prepareDatabase(client: MongoClient, database?: string, prefix?: string): Promise<Db> {
+export async function prepareDatabase(client: MongoClient, database?: string, prefix?: string, useValidation: boolean = true): Promise<Db> {
   let db = client.db(database);
   let pf = prefix ?? '';
   let colls = (await db.collections()).map((c) => c.collectionName);
   let entityCollectionName = `${pf}entities`;
-  let entityCollection = await ensureCollection(db, entityCollectionName, {
+  let entityCollection = await ensureCollection(db, entityCollectionName, useValidation ? {
     validator: {
       $jsonSchema: {
         bsonType: 'object',
@@ -41,14 +47,14 @@ export async function prepareDatabase(client: MongoClient, database?: string, pr
         }
       }
     }
-  }, !colls.includes(entityCollectionName));
+  } : undefined, !colls.includes(entityCollectionName));
   await entityCollection.createIndexes([
     {
       key: { _id: 1 }
     }
   ]);
   let resourceCollectionName = `${pf}resources`;
-  let resourceCollection = await ensureCollection(db, resourceCollectionName, {
+  let resourceCollection = await ensureCollection(db, resourceCollectionName, useValidation ? {
     validator: {
       $jsonSchema: {
         bsonType: 'object',
@@ -68,14 +74,14 @@ export async function prepareDatabase(client: MongoClient, database?: string, pr
         }
       }
     }
-  }, !colls.includes(resourceCollectionName));
+  } : undefined, !colls.includes(resourceCollectionName));
   await resourceCollection.createIndexes([
     {
       key: { _id: 1 }
     }
   ]);
   let policyCollectionName = `${pf}policy`;
-  let policyCollection = await ensureCollection(db, policyCollectionName, {
+  let policyCollection = await ensureCollection(db, policyCollectionName, useValidation ? {
     validator: {
       $jsonSchema: {
         bsonType: 'object',
@@ -124,7 +130,7 @@ export async function prepareDatabase(client: MongoClient, database?: string, pr
         }
       }
     }
-  }, !colls.includes(policyCollectionName));
+  } : undefined, !colls.includes(policyCollectionName));
   await policyCollection.createIndexes([
     {
       key: { _id: 1 }

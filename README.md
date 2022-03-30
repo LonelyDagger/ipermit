@@ -6,15 +6,14 @@ IPermit is still working in progress. It may not be able to work right now.
 However, its core concepts should be fully described in Github Wiki, so you can put into use as long as a standard version released, or contribute following the concepts.
 
 ### How to use
-After a standrad version(>=1) releases, use `npm i -S ipermit`
+After a standrad version(>=1) releases, use `npm i ipermit`
 ```js
-import { provideConfig, checkPerm } from 'ipermit';
-provideConfig({dataProvider: {type: 'mongodb', connectionString: '...'}})
+import { config, checkPerm } from 'ipermit';
+config({dataProvider: {type: 'mongodb', connectionString: '...'}})
 //...
-if(!checkPerm({resource: 'resourceId', entity: 'entityId', operation: 'read'}))
+if(!await checkPerm({resource: 'resourceId', entity: 'entityId', operation: 'read'}))
   return {code: 403,message: 'Operation not permitted'};
 ```
-
 
 ### Requirements
 #### Runtime
