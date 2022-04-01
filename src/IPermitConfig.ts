@@ -1,6 +1,6 @@
-import { TimeSpan, getMsFromTimeSpan } from "./utils/TimeSpan.js";
-import { MongoClient } from "mongodb";
-import { connect, prepareDatabase, setDefaultDb } from "./MongoDBProvider.js";
+import { TimeSpan, getMsFromTimeSpan } from './utils/TimeSpan.js';
+import { MongoClient } from 'mongodb';
+import { connect, prepareDatabase, setDefaultDb } from './MongoDBProvider.js';
 
 export class MongoDBProvider {
   type: 'mongodb' = 'mongodb';
