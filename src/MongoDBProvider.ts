@@ -1,15 +1,24 @@
-import { Db, MongoClient } from 'mongodb';
+import { Collection, Db, Filter, FindOptions, MongoClient, ObjectId } from 'mongodb';
+import { ensureObjectId, ObjectIdProvidable } from './utils/CoreUtils.js';
 
-let defaultDb: Db;
-
-export function getDefaultDb() { return defaultDb; }
-export function setDefaultDb(newDb: Db) { defaultDb = newDb; }
+export const globalDefaultProivder: { client?: MongoClient, db?: Db, entityCollection?: Collection, resourceCollection?: Collection, policyCollection?: Collection } = {};
+export function setGlobalDefaultProvider(client: MongoClient, db: Db, prefix: string = '') {
+  globalDefaultProivder.client = client;
+  globalDefaultProivder.db = db;
+  globalDefaultProivder.entityCollection = db.collection(`${prefix}entities`);
+  globalDefaultProivder.resourceCollection = db.collection(`${prefix}resources`);
+  globalDefaultProivder.policyCollection = db.collection(`${prefix}policies`);
+}
 
 export async function connect(from: string | MongoClient): Promise<MongoClient> {
   if (typeof from === 'string')
     return await new MongoClient(from, { appName: 'IPermit' }).connect();
   else
     return from;
+}
+
+export async function disconnect() {
+  return await globalDefaultProivder.client?.close?.();
 }
 
 async function ensureCollection(db: Db, collName: string, collOptions?: Object, createNew: boolean = true) {
@@ -80,13 +89,13 @@ export async function prepareDatabase(client: MongoClient, database?: string, pr
       key: { _id: 1 }
     }
   ]);
-  let policyCollectionName = `${pf}policy`;
+  let policyCollectionName = `${pf}policies`;
   let policyCollection = await ensureCollection(db, policyCollectionName, useValidation ? {
     validator: {
       $jsonSchema: {
         bsonType: 'object',
         additionalProperties: true,
-        required: ['_id', 'content'],
+        required: ['_id', 'contents'],
         properties: {
           _id: {
             bsonType: 'objectId'
@@ -106,7 +115,7 @@ export async function prepareDatabase(client: MongoClient, database?: string, pr
           priority: {
             bsonType: 'int'
           },
-          content: {
+          contents: {
             bsonType: 'array',
             items: {
               bsonType: 'object',
@@ -140,4 +149,58 @@ export async function prepareDatabase(client: MongoClient, database?: string, pr
     }
   ]);
   return db;
+}
+
+export class ObjectIdProvider {
+  _id: ObjectId;
+  constructor(id: ObjectId) {
+    this._id = id;
+  }
+}
+
+export class Datum extends ObjectIdProvider {
+  [otherProp: string | number | symbol]: any;
+
+  constructor(id: ObjectId, otherProps: { [k: string]: any }) {
+    super(id);
+    Object.assign(this, otherProps);
+  }
+
+  async save(coll: Collection) {
+    return await coll.updateOne({ _id: this._id }, { $set: this }, { upsert: true, serializeFunctions: false, ignoreUndefined: true })
+  }
+}
+
+export function createExtendable<T extends { save: (coll: Collection) => Promise<any> }>(defaultColl: Collection | (() => Collection), alwaysReturnedPropNames: string[], constructor: new (_id: ObjectId, props?: {}) => T) {
+  const preservedProjection: { [k: string]: 1 } = {};
+  for (let pk in alwaysReturnedPropNames)
+    preservedProjection[pk] = 1;
+  let getColl: () => Collection;
+  if (typeof defaultColl === 'object')
+    getColl = () => defaultColl;
+  else getColl = defaultColl;
+  return {
+    async retrieve(id: ObjectIdProvidable, externalProjection?: { [keyName: string]: 1 }, coll: Collection = getColl()) {
+      const oid = ensureObjectId(id, true);
+      const pj = Object.assign(Object.create(preservedProjection), externalProjection);
+      const qresult = await coll.findOne({ _id: oid }, { projection: pj });
+      if (!qresult) throw new Error('Unable to retrieve the specified document');
+      return new constructor(oid, qresult);
+    },
+    async modify(id: ObjectIdProvidable, propsToModify: { _id?: never, [k: string]: any }, coll: Collection = getColl()) {
+      const oid = ensureObjectId(id);
+      return await coll.updateOne({ _id: oid }, { $set: propsToModify });
+    },
+    async create({ _id, ...initialProps }: { _id?: ObjectIdProvidable, [k: string]: any } = {}, coll: Collection = getColl()) {
+      const obj = new constructor(ensureObjectId(_id), initialProps);
+      await obj.save(coll);
+      return obj;
+    },
+    async delete(id: ObjectIdProvider, coll: Collection = getColl()) {
+      return await coll.deleteOne({ _id: ensureObjectId(id, true) });
+    },
+    async find(filter: Filter<T>, options?: FindOptions, coll: Collection = getColl()) {
+      return coll.find(filter, options);
+    }
+  };
 }

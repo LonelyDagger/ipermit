@@ -1,6 +1,6 @@
 import { TimeSpan, getMsFromTimeSpan } from './utils/TimeSpan.js';
 import { MongoClient } from 'mongodb';
-import { connect, prepareDatabase, setDefaultDb } from './MongoDBProvider.js';
+import { connect, disconnect, prepareDatabase, setGlobalDefaultProvider } from './MongoDBProvider.js';
 
 export class MongoDBProvider {
   type: 'mongodb' = 'mongodb';
@@ -131,7 +131,8 @@ export async function config(config: IPermitConfig): Promise<void> {
     }
   //TODO Map originalConfig to flat innerConfig.
 
+  await disconnect();
   innerConfig.dataProvider_db = await connect(config.dataProvider.mongnClient ?? config.dataProvider.connectionString ?? 'mongodb://127.0.0.1/ipermit');
   const db = await prepareDatabase(innerConfig.dataProvider_db, config.dataProvider.database, config.dataProvider.collectionPrefix);
-  setDefaultDb(db);
+  setGlobalDefaultProvider(innerConfig.dataProvider_db, db, config.dataProvider.collectionPrefix);
 }
