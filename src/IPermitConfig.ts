@@ -3,7 +3,7 @@ import { MongoClient } from 'mongodb';
 import { connect, disconnect, prepareDatabase, setGlobalDefaultProvider } from './MongoDBProvider.js';
 
 export class MongoDBProvider {
-  type: 'mongodb' = 'mongodb';
+  type: 'mongodb' | undefined = 'mongodb';
   connectionString?: `${'mongodb' | 'mongodb+srv'}://${string}`;
   mongnClient?: MongoClient;
   database?: string;

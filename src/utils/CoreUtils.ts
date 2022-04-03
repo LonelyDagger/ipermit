@@ -11,6 +11,8 @@ export type ObjectIdProvidable = undefined | string | ObjectId | { _id: ObjectId
 export function ensureObjectId(value: ObjectIdProvidable, requireExisted: boolean = false): ObjectId {
   if (requireExisted && !value)
     throw new Error('Require an existent ObjectId');
+  if (value instanceof ObjectId)
+    return value;
   return (typeof value === 'object' && '_id' in value) ? value._id : new ObjectId(value);
 }
 

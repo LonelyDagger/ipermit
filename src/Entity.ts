@@ -15,18 +15,11 @@ function getEntityCollection(): Collection { return <Collection>globalDefaultPro
 export class Entity extends Datum {
   parents: ObjectId[];
 
-  /**
-   * Create a new instance of Entity.
-   * 
-   * Constructing an instance **does nothing to db**. Use `save` to store it.
-   * @param id 
-   * @param param1 An object containing initial fields. The `_id` property of this object will be ignored.
-   */
-  constructor(id: ObjectId, { _id, parents, ...otherProps }: { parents?: Iterable<ObjectId> | ProjectionMap<string, ObjectId>, [k: string]: any } = {}) {
+  constructor(id: ObjectId, { parents, ...otherProps }: { _id?: never, parents?: Iterable<ObjectId> | ProjectionMap<string, ObjectId>, [k: string]: any } = {}) {
     super(id, otherProps);
     if (parents instanceof ProjectionMap<string, ObjectId>)
       parents = parents.values();
-    this.parents = [...ensureElementsUnique(parents)];
+    this.parents = [...ensureElementsUnique(parents, (v) => v.toString())];
   }
 }
 

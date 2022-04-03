@@ -120,16 +120,16 @@ function getPolicyCollection(): Collection { return <Collection>globalDefaultPro
 export class Policy extends Datum {
   selector?: PolicySelector;
   contents: PolicyContent[];
-  priority?: number;
+  priority: number;
 
-  constructor(id: ObjectId, { _id, selector, contents, priority, ...otherProps }: { selector?: PolicySelector, contents?: PolicyContent[], priority?: number, [k: string]: any } = {}) {
+  constructor(id: ObjectId, { selector, contents = [], priority = 0, ...otherProps }: { _id?: never, selector?: PolicySelector, contents?: Iterable<PolicyContent>, priority?: number, [k: string]: any } = {}) {
     super(id, otherProps);
     this.selector = selector;
-    this.contents = contents ?? [];
+    this.contents = [...ensureElementsUnique(contents)];
     this.priority = priority;
   }
 
-  async applyOn(context: CheckPermContext): Promise<boolean | null> {
+  async applyTo(context: CheckPermContext): Promise<boolean | null> {
     let allowed;
     for (let c of this.contents) {
       const f = compileCheck(c.check);

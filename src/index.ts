@@ -1,4 +1,4 @@
-import { BSONType, FindCursor, ObjectId } from 'mongodb';
+import { BSONType, ObjectId } from 'mongodb';
 import { ascertainAncestors, Entity, retrieveEntity } from './Entity.js';
 import { findPolicies, Policy } from './Policy.js';
 import { Resource, retrieveResource } from './Resource.js';
@@ -23,8 +23,8 @@ export async function retrieveRelevantPolicies(resource: Resource): Promise<Poli
     resOwnerFilter = {
       $and: [
         { 'selector.resourceOwner': { $type: BSONType.object } },
-        { 'selector.resourceOwner.id': { $in: [undefined, '*', resource.owner] } },
-        { 'selector.resourceOwner.subof': { $in: [undefined, '*', ...anc] } }
+        { 'selector.resourceOwner.id': { $in: [null, '*', resource.owner] } },
+        { 'selector.resourceOwner.subof': { $in: [null, '*', ...anc] } }
       ]
     };
   }
@@ -40,10 +40,10 @@ export async function retrieveRelevantPolicies(resource: Resource): Promise<Poli
       {
         $and: [
           { selector: { $type: BSONType.object } },
-          { 'selector.resourceType': { $in: [undefined, '*', resource.type] } },
+          { 'selector.resourceType': { $in: [null, '*', resource.type] } },
           {
             $or: [
-              { 'selector.resourceOwner': { $in: [undefined, '*'] } },
+              { 'selector.resourceOwner': { $in: [null, '*'] } },
               resOwnerFilter
             ]
           }
@@ -51,17 +51,16 @@ export async function retrieveRelevantPolicies(resource: Resource): Promise<Poli
       },
       (resource.boundPolicies && resource.boundPolicies.length) ? { _id: { $in: resource.boundPolicies } } : {}
     ]
-  }, { projection: { _id: 1, contents: 1, priority: 1 } })).toArray()).map(({ _id, ...otherProps }) => new Policy(_id, otherProps));
+  }, { sort: { priority: -1 }, projection: { _id: 1, contents: 1, priority: 1 } })).toArray()).map(({ _id, ...otherProps }) => new Policy(_id, otherProps));
 }
 
 export async function checkPerm({ requester, access, resource }: { requester: ObjectIdProvidable | Entity, access: string, resource: ObjectIdProvidable | Resource }): Promise<boolean> {
   // const requesterIns = requester instanceof Entity ? requester : await retrieveEntity(requester);
   const resourceIns = resource instanceof Resource ? resource : await retrieveResource(resource);
   const policies = await retrieveRelevantPolicies(resourceIns);
-  policies.sort(({ priority: pa = 0 }, { priority: pb = 0 }) => pb - pa);
   const context: CheckPermContext = { requester: ensureObjectId(requester), access, resource: ensureObjectId(resource) };
   for (let p of policies) {
-    switch (await p.applyOn(context)) {
+    switch (await p.applyTo(context)) {
       case false:
         return false;
       case true:
