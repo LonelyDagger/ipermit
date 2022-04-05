@@ -25,10 +25,6 @@ export class Entity extends Datum {
 
 export const { retrieve: retrieveEntity, modify: modifyEntity, create: createEntity, delete: deleteEntity, find: findEntities } = createExtendable(getEntityCollection, ['parents'], Entity);
 
-export async function addParent(target: ObjectIdProvidable, parent: ObjectIdProvidable, coll: Collection = getEntityCollection()) {
-  return await coll.updateOne({ _id: ensureObjectId(target, true) }, { $addToSet: { parents: ensureObjectId(parent, true) } });
-}
-
 export async function ascertainAncestors(node: ObjectIdProvidable, includeSelf: boolean = false, coll: Collection = getEntityCollection()): Promise<IterableIterator<ObjectId>> {
   const e = await retrieveEntity(node, undefined, coll);
   const parents = e.parents;

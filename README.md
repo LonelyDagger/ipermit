@@ -26,9 +26,9 @@ You can add your own fields to their prototypes or instances. Use API like `modi
 #### Entities
 They can be users, bots, or groups. Entity can inherit from others.
 #### Resources
-They represents something requires permission to access. Resource contains a list of policies bound to it.
+They represent something requires permission to access. Resource contains a list of policies bound to it.
 #### Policies
-They describes who can access what in which way. Policy can provide a universal model to control access, or just give certain permission.
+They describe who can access what in which way. Policy can provide a universal model to control access, or just give certain permission.
 
 They contain **selector**, to forcedly apply to resources, **contents**, a list of check-react pairs, and **priority**.
 

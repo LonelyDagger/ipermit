@@ -8,7 +8,7 @@ export type ObjectIdDescriber = ObjectId;
 
 export interface EntityIdEquals { id: ObjectIdDescriber; }
 export interface EntitySubOf { subof: ObjectIdDescriber; }
-export type EntityRestrictorObject = EntityIdEquals | EntitySubOf;
+export type EntityRestrictorObject = EntityIdEquals | EntitySubOf | { [customOpName: string]: any };
 export type EntityRestrictor = EntityRestrictorObject | '*';
 
 export interface RequesterCondtion { requester: EntityRestrictor; }
@@ -16,7 +16,7 @@ export interface ResourceIdCondtion { resourceId: ObjectIdDescriber; }
 export interface AccessCondition { access: string | string[]; }
 export interface OrCondition { or: PolicyCheckCondition[]; }
 export interface AndCondition { and: PolicyCheckCondition[]; }
-export type PolicyCheckCondition = RequesterCondtion | ResourceIdCondtion | AccessCondition | OrCondition | AndCondition;
+export type PolicyCheckCondition = RequesterCondtion | ResourceIdCondtion | AccessCondition | OrCondition | AndCondition | { [customOpName: string]: any };
 
 export type PolicyCheck = PolicyCheckCondition;
 export type PolicyReact = boolean | undefined;
@@ -31,6 +31,11 @@ export interface PolicyContent {
   react: PolicyReact;
 }
 
+interface EntityRestrictorOps { [name: string]: (value: any) => ((entity: ObjectId) => boolean); }
+const customEntityRestrictorOps: EntityRestrictorOps = {};
+export function addCustomEntityRestrictorOps(v: EntityRestrictorOps) {
+  Object.assign(customEntityRestrictorOps, v);
+}
 export function compileEntityRestrictor(origin: EntityRestrictorObject): (entity: ObjectId) => Promise<boolean> {
   const terms: ((entity: ObjectId) => Promise<boolean> | boolean)[] = [];
   for (let k in origin) {
@@ -51,6 +56,11 @@ export function compileEntityRestrictor(origin: EntityRestrictorObject): (entity
         break;
       }
       default:
+        const co = customEntityRestrictorOps[k];
+        if (typeof co === 'function') {
+          t = co((<any>origin)[k]);
+          break;
+        }
         throw new Error('Unknown EntityRestictor definition');
     }
     terms.push(t);
@@ -58,6 +68,11 @@ export function compileEntityRestrictor(origin: EntityRestrictorObject): (entity
   return LogicalAnd(terms);
 }
 
+interface CheckOps { [name: string]: (value: any) => ((context: CheckPermContext) => boolean); }
+const customCheckOps: CheckOps = {};
+export function addCustomCheckOps(v: CheckOps) {
+  Object.assign(customCheckOps, v);
+}
 export function compileCheck(origin: PolicyCheckCondition): (context: CheckPermContext) => Promise<boolean> | boolean {
   const terms: ((context: CheckPermContext) => Promise<boolean> | boolean)[] = [];
   for (let k in origin) {
@@ -90,10 +105,17 @@ export function compileCheck(origin: PolicyCheckCondition): (context: CheckPermC
         t = LogicalAnd((<AndCondition>origin).and.map(compileCheck));
         break;
       default:
+        const co = customCheckOps[k];
+        if (typeof co === 'function') {
+          t = co((<any>origin)[k]);
+          break;
+        }
         throw new Error('Unknown PolicyCheck definition');
     }
     terms.push(t);
   }
+  if (terms.length === 0)
+    return () => true;
   if (terms.length === 1)
     return terms[0];
   return LogicalAnd(terms);
@@ -145,6 +167,21 @@ export class Policy extends Datum {
     if (allowed)
       return true;
     return null;
+  }
+}
+
+/**
+ * Ensure the specified policies exist, otherwise insert them with a generated `_id`. Replace or insert the document with specified `_id` if provided.
+ * 
+ * Any field except `_id` differing from existent document may result in inserting a new document. If this is not expected, please provide a constant `_id`.
+ */
+export async function ensurePolicies(policies: Iterable<Policy>, coll: Collection = getPolicyCollection()) {
+  for (let p of policies) {
+    const { _id, ...otherProps } = p;
+    if (_id instanceof ObjectId) {
+      await coll.replaceOne({ _id: p._id }, otherProps, { upsert: true });
+    }
+    else await coll.updateOne(p, { $set: p }, { upsert: true });
   }
 }
 

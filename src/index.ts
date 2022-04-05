@@ -54,18 +54,51 @@ export async function retrieveRelevantPolicies(resource: Resource): Promise<Poli
   }, { sort: { priority: -1 }, projection: { _id: 1, contents: 1, priority: 1 } })).toArray()).map(({ _id, ...otherProps }) => new Policy(_id, otherProps));
 }
 
-export async function checkPerm({ requester, access, resource }: { requester: ObjectIdProvidable | Entity, access: string, resource: ObjectIdProvidable | Resource }): Promise<boolean> {
+const defaultCompounder = {
+  callback({ reactions }: CompounderContext) {
+    let allowed;
+    for (let r of reactions) {
+      if (r === false)
+        return false;
+      if (r === true)
+        allowed = true;
+    }
+    if (allowed)
+      return true;
+    throw new Error('No policy reacted. Ensure at least one fallback policy is provided');
+  },
+  type: <'conclude'>'conclude'
+};
+
+export async function checkPerm({ requester, access, resource }: { requester: ObjectIdProvidable | Entity, access: string, resource: ObjectIdProvidable | Resource }, { callback, type = 'conclude' }: { callback: ReactionCompounder, type?: 'each' | 'conclude' | 'all' } = defaultCompounder): Promise<boolean> {
   // const requesterIns = requester instanceof Entity ? requester : await retrieveEntity(requester);
   const resourceIns = resource instanceof Resource ? resource : await retrieveResource(resource);
   const policies = await retrieveRelevantPolicies(resourceIns);
-  const context: CheckPermContext = { requester: ensureObjectId(requester), access, resource: ensureObjectId(resource) };
-  for (let p of policies) {
-    switch (await p.applyTo(context)) {
-      case false:
-        return false;
-      case true:
-        return true;
+  const checkContext: CheckPermContext = { requester: ensureObjectId(requester), access, resource: ensureObjectId(resource) };
+  const compounderContext: CompounderContext = { policies, index: 0, reaction: null, reactions: new Array(policies.length) };
+  for (; compounderContext.index < policies.length; compounderContext.index++) {
+    compounderContext.reaction = (await policies[compounderContext.index].applyTo(checkContext));
+    compounderContext.reactions[compounderContext.index] = compounderContext.reaction;
+    if (type === 'each' || type === 'all') {
+      let er = callback(compounderContext);
+      if (typeof er === 'boolean')
+        return er;
     }
   }
-  throw new Error('No policy reacted. Ensure at least one fallback policy is provided');
+  if (type === 'conclude' || type === 'all') {
+    let cr = callback(compounderContext);
+    if (typeof cr === 'boolean')
+      return cr;
+  }
+  throw new Error('Invalid result from ReactionCompounder');
 }
+
+
+interface CompounderContext {
+  policies: Policy[];
+  reactions: (boolean | null)[];
+  index: number;
+  reaction: boolean | null;
+}
+
+export type ReactionCompounder = (compounderContext: CompounderContext) => boolean | null;

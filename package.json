@@ -14,7 +14,7 @@
     "testOnly": "node ./test/index.js",
     "test": "npm run build&&npm run testOnly",
     "doc": "typedoc",
-    "build": "(rm -rf ./dist||(rmdir /S /Q .\\dist||echo Directory ./dist doesn't exist.))&&tsc",
+    "build": "tsc",
     "prepack": "npm run build"
   },
   "publishConfig": {

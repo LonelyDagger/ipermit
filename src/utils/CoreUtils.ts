@@ -29,3 +29,20 @@ export function isSubsetOf<T>(self: T | T[], target: T[]): boolean {
       return false;
   return true;
 }
+
+export function toDotNotation(obj: { [k: string]: any }): { [k: string]: any } {
+  const r: { [k: string]: any } = {};
+  for (let k in obj) {
+    if (typeof obj[k] === 'object') {
+      let m;
+      const i = toDotNotation(obj[k]);
+      for (let s in i) {
+        r[`${k}.${s}`] = i[s];
+        m = true;
+      }
+      if (!m) r[k] = {};
+    }
+    else r[k] = obj[k];
+  }
+  return r;
+}
