@@ -4,16 +4,16 @@ import { findPolicies, Policy } from './Policy.js';
 import { Resource, retrieveResource } from './Resource.js';
 import { ensureObjectId, ObjectIdProvidable } from './utils/CoreUtils.js';
 
-export { TimeSpan } from './utils/TimeSpan.js';
+export { TimeSpan } from './utils/TimeSpan';
 export { MongoDBProvider, CacheConfig, CacheType, IPermitConfig, config } from './IPermitConfig.js';
 export * from './Entity.js';
 export * from './Resource.js';
 export * from './Policy.js';
 
 export interface CheckPermContext {
-  requester: ObjectId;
+  requester: Entity;
   access: string | string[];
-  resource: ObjectId;
+  resource: Resource;
 }
 
 export async function retrieveRelevantPolicies(resource: Resource): Promise<Policy[]> {
@@ -51,7 +51,7 @@ export async function retrieveRelevantPolicies(resource: Resource): Promise<Poli
       },
       (resource.boundPolicies && resource.boundPolicies.length) ? { _id: { $in: resource.boundPolicies } } : {}
     ]
-  }, { sort: { priority: -1 }, projection: { _id: 1, contents: 1, priority: 1 } })).toArray()).map(({ _id, ...otherProps }) => new Policy(_id, otherProps));
+  }, { sort: { priority: -1 }, projection: { _id: 1, contents: 1, priority: 1 } })).toArray()).map(({ ...props }) => new Policy(props));
 }
 
 const defaultCompounder = {
@@ -70,23 +70,23 @@ const defaultCompounder = {
   type: <'conclude'>'conclude'
 };
 
-export async function checkPerm({ requester, access, resource }: { requester: ObjectIdProvidable | Entity, access: string, resource: ObjectIdProvidable | Resource }, { callback, type = 'conclude' }: { callback: ReactionCompounder, type?: 'each' | 'conclude' | 'all' } = defaultCompounder): Promise<boolean> {
-  // const requesterIns = requester instanceof Entity ? requester : await retrieveEntity(requester);
+export async function checkPerm({ requester, access, resource, ...otherProps }: { requester: ObjectIdProvidable | Entity, access: string, resource: ObjectIdProvidable | Resource, [otherProps: string | number | symbol]: any }, { callback, type = 'conclude' }: { callback: ReactionCompounder, type?: 'each' | 'conclude' | 'all' } = defaultCompounder): Promise<boolean> {
+  const requesterIns = requester instanceof Entity ? requester : await retrieveEntity(requester);
   const resourceIns = resource instanceof Resource ? resource : await retrieveResource(resource);
   const policies = await retrieveRelevantPolicies(resourceIns);
-  const checkContext: CheckPermContext = { requester: ensureObjectId(requester), access, resource: ensureObjectId(resource) };
+  const checkContext: CheckPermContext = { requester: requesterIns, access, resource: resourceIns, ...otherProps };
   const compounderContext: CompounderContext = { policies, index: 0, reaction: null, reactions: new Array(policies.length) };
   for (; compounderContext.index < policies.length; compounderContext.index++) {
     compounderContext.reaction = (await policies[compounderContext.index].applyTo(checkContext));
     compounderContext.reactions[compounderContext.index] = compounderContext.reaction;
     if (type === 'each' || type === 'all') {
-      let er = callback(compounderContext);
+      let er = await callback(compounderContext);
       if (typeof er === 'boolean')
         return er;
     }
   }
   if (type === 'conclude' || type === 'all') {
-    let cr = callback(compounderContext);
+    let cr = await callback(compounderContext);
     if (typeof cr === 'boolean')
       return cr;
   }
@@ -94,11 +94,11 @@ export async function checkPerm({ requester, access, resource }: { requester: Ob
 }
 
 
-interface CompounderContext {
+export interface CompounderContext {
   policies: Policy[];
   reactions: (boolean | null)[];
   index: number;
   reaction: boolean | null;
 }
 
-export type ReactionCompounder = (compounderContext: CompounderContext) => boolean | null;
+export type ReactionCompounder = (compounderContext: CompounderContext) => boolean | null | Promise<boolean | null>;

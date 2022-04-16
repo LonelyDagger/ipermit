@@ -1,5 +1,5 @@
 import { Collection, ObjectId } from "mongodb";
-import { ascertainAncestors } from "./Entity.js";
+import { ascertainAncestors, Entity } from "./Entity.js";
 import { CheckPermContext } from "./index.js";
 import { createExtendable, Datum, globalDefaultProivder } from "./MongoDBProvider.js";
 import { ensureElementsUnique, ensureStringArray, isSubsetOf } from "./utils/CoreUtils.js";
@@ -14,9 +14,11 @@ export type EntityRestrictor = EntityRestrictorObject | '*';
 export interface RequesterCondtion { requester: EntityRestrictor; }
 export interface ResourceIdCondtion { resourceId: ObjectIdDescriber; }
 export interface AccessCondition { access: string | string[]; }
+export interface NotCondition { not: PolicyCheckCondition; }
+export interface NorCondition { nor: PolicyCheckCondition[]; }
 export interface OrCondition { or: PolicyCheckCondition[]; }
 export interface AndCondition { and: PolicyCheckCondition[]; }
-export type PolicyCheckCondition = RequesterCondtion | ResourceIdCondtion | AccessCondition | OrCondition | AndCondition | { [customOpName: string]: any };
+export type PolicyCheckCondition = RequesterCondtion | ResourceIdCondtion | AccessCondition | NotCondition | NorCondition | OrCondition | AndCondition | { [customOpName: string]: any };
 
 export type PolicyCheck = PolicyCheckCondition;
 export type PolicyReact = boolean | undefined;
@@ -31,26 +33,28 @@ export interface PolicyContent {
   react: PolicyReact;
 }
 
-interface EntityRestrictorOps { [name: string]: (value: any) => ((entity: ObjectId) => boolean); }
+interface EntityRestrictorOps { [name: string]: (value: any) => ((entity: Entity) => boolean); }
 const customEntityRestrictorOps: EntityRestrictorOps = {};
 export function addCustomEntityRestrictorOps(v: EntityRestrictorOps) {
   Object.assign(customEntityRestrictorOps, v);
 }
-export function compileEntityRestrictor(origin: EntityRestrictorObject): (entity: ObjectId) => Promise<boolean> {
-  const terms: ((entity: ObjectId) => Promise<boolean> | boolean)[] = [];
+export function compileEntityRestrictor(origin: EntityRestrictorObject): (entity: Entity) => Promise<boolean> {
+  const terms: ((entity: Entity) => Promise<boolean> | boolean)[] = [];
   for (let k in origin) {
-    let t: (entity: ObjectId) => Promise<boolean> | boolean;
+    let t: (entity: Entity) => Promise<boolean> | boolean;
     switch (k) {
-      case 'id':
-        t = ObjectId.prototype.equals.bind(new ObjectId((<EntityIdEquals>origin).id));
+      case 'id': {
+        const v = new ObjectId((<EntityIdEquals>origin).id);
+        t = (e) => v.equals(e._id);
         break;
+      }
       case 'subof': {
         const v = new ObjectId((<EntityIdEquals>origin).id);
-        t = async (entity: ObjectId) => {
-          if (v.equals(entity)) return true;
+        t = async (entity: Entity) => {
+          if (v.equals(entity._id)) return true;
           const iterator = await ascertainAncestors(entity);
           for (let i of iterator)
-            if (i.equals(entity)) return true;
+            if (i.equals(entity._id)) return true;
           return false;
         };
         break;
@@ -90,14 +94,20 @@ export function compileCheck(origin: PolicyCheckCondition): (context: CheckPermC
       }
       case 'resourceId': {
         const v = new ObjectId((<ResourceIdCondtion>origin).resourceId);
-        t = (context: CheckPermContext) => v.equals(context.resource);
-        break;
+        t = (context: CheckPermContext) => v.equals(context.resource._id);
+        break; 
       }
       case 'access': {
         const allowedAccess = [...ensureElementsUnique(ensureStringArray((<AccessCondition>origin).access))];
         t = (context: CheckPermContext) => isSubsetOf(context.access, allowedAccess);
         break;
       }
+      case 'not':
+        t = LogicalNot(compileCheck((<NotCondition>origin).not));
+        break;
+      case 'nor':
+        t = LogicalNot(LogicalOr((<NorCondition>origin).nor.map(compileCheck)));
+        break;
       case 'or':
         t = LogicalOr((<OrCondition>origin).or.map(compileCheck));
         break;
@@ -121,6 +131,9 @@ export function compileCheck(origin: PolicyCheckCondition): (context: CheckPermC
   return LogicalAnd(terms);
 }
 
+function LogicalNot<T>(term: ((arg: T) => Promise<boolean> | boolean)): (arg: T) => Promise<boolean> {
+  return async (arg: T) => !await term(arg);
+}
 function LogicalOr<T>(terms: ((arg: T) => Promise<boolean> | boolean)[]): (arg: T) => Promise<boolean> {
   return async (arg: T) => {
     for (let t of terms)
@@ -128,14 +141,13 @@ function LogicalOr<T>(terms: ((arg: T) => Promise<boolean> | boolean)[]): (arg: 
     return false;
   }
 }
-
 function LogicalAnd<T>(terms: ((arg: T) => Promise<boolean> | boolean)[]): (arg: T) => Promise<boolean> {
   return async (arg: T) => {
     for (let t of terms)
       if (!await t(arg)) return false;
     return true;
   }
-}
+} 
 
 function getPolicyCollection(): Collection { return <Collection>globalDefaultProivder.policyCollection; }
 
@@ -144,8 +156,8 @@ export class Policy extends Datum {
   contents: PolicyContent[];
   priority: number;
 
-  constructor(id: ObjectId, { selector, contents = [], priority = 0, ...otherProps }: { _id?: never, selector?: PolicySelector, contents?: Iterable<PolicyContent>, priority?: number, [k: string]: any } = {}) {
-    super(id, otherProps);
+  constructor({ selector, contents, priority = 0, ...otherProps }: { _id?: ObjectId, selector?: PolicySelector, contents?: Iterable<PolicyContent>, priority?: number, [k: string]: any } = {}) {
+    super(otherProps);
     this.selector = selector;
     this.contents = [...ensureElementsUnique(contents)];
     this.priority = priority;

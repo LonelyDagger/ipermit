@@ -16,7 +16,6 @@ export async function connect(from: string | MongoClient): Promise<MongoClient> 
   else
     return from;
 }
-
 export async function disconnect() {
   return await globalDefaultProivder.client?.close?.();
 }
@@ -157,12 +156,11 @@ export class ObjectIdProvider {
     this._id = id;
   }
 }
-
 export class Datum extends ObjectIdProvider {
   [otherProp: string | number | symbol]: any;
 
-  constructor(id: ObjectId, { _id, ...otherProps }: DatumProps) {
-    super(id);
+  constructor({ _id, ...otherProps }: DatumProps) {
+    super(ensureObjectId(_id));
     Object.assign(this, otherProps);
   }
 
@@ -171,13 +169,12 @@ export class Datum extends ObjectIdProvider {
   }
 }
 
-interface DatumProps {
-  _id?: never;
+export interface DatumProps {
   [k: string]: any;
 }
 
-export function createExtendable<T extends { save: (coll: Collection) => Promise<any> }, P extends DatumProps>(defaultColl: Collection | (() => Collection), alwaysReturnedPropNames: string[], constructor: new (_id: ObjectId, props?: P) => T) {
-  const preservedProjection: { [k: string]: 1 } = {};
+export function createExtendable<T extends { save: (coll: Collection) => Promise<any> }, P extends DatumProps>(defaultColl: Collection | (() => Collection), alwaysReturnedPropNames: string[], constructor: new (props?: P) => T) {
+  const preservedProjection: { [k: string]: 1 } = { _id: 1 };
   for (let pk in alwaysReturnedPropNames)
     preservedProjection[pk] = 1;
   let getColl: () => Collection;
@@ -190,14 +187,14 @@ export function createExtendable<T extends { save: (coll: Collection) => Promise
       const pj = Object.assign(Object.create(preservedProjection), externalProjection);
       const qresult = await coll.findOne({ _id: oid }, { projection: pj });
       if (!qresult) throw new Error('Unable to retrieve the specified document');
-      return new constructor(oid, <P><unknown>qresult);
+      return new constructor(<P><unknown>qresult);
     },
     async modify(id: ObjectIdProvidable, propsToModify: { [k: string]: any }, coll: Collection = getColl()) {
       const oid = ensureObjectId(id);
       return await coll.updateOne({ _id: oid }, { $set: propsToModify });
     },
-    async create({ _id, ...initialProps }: { _id?: ObjectId } & P = <P>{}, coll: Collection = getColl()) {
-      const obj = new constructor(ensureObjectId(_id), <P>initialProps);
+    async create(props: P, coll: Collection = getColl()) {
+      const obj = new constructor(props);
       await obj.save(coll);
       return obj;
     },

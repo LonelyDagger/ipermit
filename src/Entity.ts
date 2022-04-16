@@ -15,8 +15,8 @@ function getEntityCollection(): Collection { return <Collection>globalDefaultPro
 export class Entity extends Datum {
   parents: ObjectId[];
 
-  constructor(id: ObjectId, { parents, ...otherProps }: { _id?: never, parents?: Iterable<ObjectId> | ProjectionMap<string, ObjectId>, [k: string]: any } = {}) {
-    super(id, otherProps);
+  constructor({ parents, ...otherProps }: { _id?: ObjectId, parents?: Iterable<ObjectId> | ProjectionMap<string, ObjectId>, [k: string]: any } = {}) {
+    super(otherProps);
     if (parents instanceof ProjectionMap<string, ObjectId>)
       parents = parents.values();
     this.parents = [...ensureElementsUnique(parents, (v) => v.toString())];

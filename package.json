@@ -11,8 +11,8 @@
     "node": ">=12.0.0"
   },
   "scripts": {
-    "testOnly": "node ./test/index.js",
-    "test": "npm run build&&npm run testOnly",
+    "dev": "tsc -w",
+    "test": "node ./test/index.js",
     "doc": "typedoc",
     "build": "tsc",
     "prepack": "npm run build"
