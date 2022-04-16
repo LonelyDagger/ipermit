@@ -10,25 +10,19 @@ export class MongoDBProvider {
   collectionPrefix?: string
 }
 
-export class CacheConfig {
+export interface CacheConfig {
   enabled?: boolean;
   /** Remove cache when the length of the cache array exceeds. */
   maxLength?: {
     value: number;
-    remove?: 'earliest' | 'leastUsed';
     /**
      * When ought to remove terms, the amount of items to remove.
      * 
      * Can be set to number or string to specify percent of max length like `10%`. 
      */
     removeAmount?: number | string;
-  } | number
-    = {
-      value: 500,
-      remove: 'earliest',
-      removeAmount: '10%'
-    };
-  /** Remove cache after a period. */
+  } | number;
+  /** Remove cache after a period. **Currently ignored**. */
   lifecycle?: {
     value: TimeSpan,
     /**
@@ -44,27 +38,8 @@ export class CacheConfig {
      */
     allocateInterval?: TimeSpan,
     /** Max length of terms in a batch. */
-    maxLength?: number,
-    /**
-     * Action to take when length of terms in a batch reaches the limit.
-     * 
-     * This config is ignored if allocate lifecycle by batch is disabled.
-     * 
-     * `'remove'` Remove the earliest term in the batch.
-     * 
-     * `'immediate'` Set lifecycle for this batch immediately.
-     * 
-     * `'stack'` Seal this batch and wait for the allocate interval. New cache terms will be pushed into new batch.
-     */
-    actionOnExceeded?: 'remove' | 'immediate' | 'stack'
-  } | TimeSpan
-    = {
-      value: 1000 * 60 * 30,
-      refreshOnUsed: true,
-      allocateInterval: 1000,
-      maxLength: 100,
-      actionOnExceeded: 'immediate'
-    };
+    maxLength?: number
+  } | TimeSpan;
   /**
    * Ensure cache reliable by removing caches after making deterministic changes to database. Only applied to changes made by IPermit API.
    * 
@@ -103,7 +78,6 @@ export class IPermitConfig {
       enabled: true,
       maxLength: {
         value: 300,
-        remove: 'earliest',
         removeAmount: 50
       }
     };
